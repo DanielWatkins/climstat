@@ -5,3 +5,5 @@ climstat is (to be) a Python library containing implementations of robust statis
 
 climstat is for Python 3 and depends on Numpy and Scipy.stats
 Currently, I am using Numpy 1.10.4, Scipy 0.18.1, and Python 3.4.5.
+
+Yes, there is another package called climstats in Python and in R. No, I don't really care. If I get enough code put together on this that it could be published, I'll change the name.
