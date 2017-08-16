@@ -56,7 +56,7 @@ def robust_rank_order_test(x,y):
     
     return p
 
-def single_change_point_test(x):
+def single_change_point_test(x, secondary=False):
     """
     From Lazante 1996: The change-point test presented here is used to determine if, and 
     locate a point in the time series at which, the median changes. The 
@@ -81,6 +81,10 @@ def single_change_point_test(x):
         SA[i] = np.abs((2*SR[i] - i*(n+1)))
         
     n1 = np.argmax(SA)
+    
+    if secondary:
+        n1 = np.argsort(SA)[-2]
+    
     W = SR[n1]
     n2 = n - n1
     
@@ -222,31 +226,13 @@ def multiple_change_point_test(x,alpha=0.05, rdn=0.075, min_dist=10):
     of a segment.
     
     
-    
+    TO CHANGE: right now it does find the change points, but it isn't 
+    exactly the same method as described in Lazante. In this code,
+    each segment is searched for a new change point individually. In
+    Lazante, I think I'm supposed to rejoin the segments and perform
+    a changepoint search on the entire adjusted list.
     """
-    
-    def update_lists(x,new_cp,cp_list,check_seg,min_dist):
-        """Make new list with all unique cps found so far,
-        then update the check_seg list, requiring that segments 
-        at least be 2xmin_dist in length in order to be searched for 
-        change points."""
-
-        new_cp_list = np.unique(np.concatenate((new_cp,cp_list)))
-
-        # Indices of cps from previous iteration
-        idx_old = np.where([cp in cp_list for cp in new_cp_list])[0][:-1]
-
-        new_check_seg = np.ones(len(new_cp_list)-1)*True
-        new_check_seg[idx_old] = check_seg
-
-        new_seg_list = make_segment_list(x,new_cp_list)
-        for i in range(len(new_seg_list)):
-            if len(new_seg_list[i]) <= 2*min_dist:
-                new_check_seg[i] = False
-
-        return new_check_seg, new_seg_list, new_cp_list
-
-    def make_segment_list(x,cp_list):
+    def adjust_series(x,cp_list):
         """Make a list of segments and normalize by subtracting the median.
         x is the original sequence, and cp_list is the sorted list of change
         points including the endpoints."""
@@ -257,51 +243,38 @@ def multiple_change_point_test(x,alpha=0.05, rdn=0.075, min_dist=10):
             seg_list.append(x[cp_list[i]:cp_list[i+1]])
             seg_list[i] = seg_list[i] - np.median(seg_list[i])
 
-        return seg_list
-
+        return np.concatenate(seg_list)
     
     n = len(x)
+    cp, p = single_change_point_test(x)
+    cp_list = np.array([0,cp,n])
     
-    cp_list = np.array([0,n])
-    check_seg = np.array([True])
-    seg_list = make_segment_list(x,cp_list)
-    num_seg = len(seg_list)
-    count = 0
-    while any(check_seg):
-        count += 1
-        new_cp = []
-        for i in range(len(seg_list)):
-            seg = seg_list[i]
-            check = check_seg[i]
-            left_idx = cp_list[i]
-            if check:
-                # Get candidate cp
-                cp,p = single_change_point_test(seg)
-                # If candidate is significant and far enough from both edges
-                if np.all([cp > min_dist, 
-                           len(seg)-cp > min_dist, 
-                           p <= alpha, 
-                           change_point_snr(seg, cp) >= rdn]):
-                    
-                    # Check whether difference is significant
-                    
-                    p = robust_rank_order_test(seg[0:cp],seg[cp:])
-          
-                    if p < alpha:
-                        new_cp.append(cp+cp_list[i])
-           
-        # After going through the full list of segments,
-        # we've only kept change points that divide the original
-        # data into sections with significantly different medians.
-        # We've already set check_seg to false for change points that
-        # are too close to edges, don't have high enought snr, and 
-        # are not significant. Now we update the cp_list and check_seg.
+    if (cp < min_dist) | (n - cp < min_dist):
+        p = 1
+    
+    while p < alpha:
         
-        if len(new_cp) > 0:
-            new_cp = np.array(new_cp)
-            check_seg, seg_list, cp_list = update_lists(x,new_cp,cp_list,check_seg,min_dist)
-        else:
-            check_seg = [False]
-       
+        x = adjust_series(x,cp_list)
+        cp, p = single_change_point_test(x)
+        # if repeated, look for secondary change point
+        if cp in cp_list:
+            cp, p = single_change_point_test(x,secondary=True)
+        
+        # if too close to endpoints stop iteration
+        if (cp < min_dist) | (n - cp < min_dist):
+            p = 1
     
-    return cp_list  
+        # if change point too close to another change point
+        # stop iteration
+        if np.min(abs(cp_list - cp)) < min_dist:
+            p = 1
+            
+        # also check that medians are different using the
+        # robust rank order test.
+        if p < alpha:
+            p = robust_rank_order_test(x[0:cp],x[cp:])
+        
+        if p < alpha:
+            cp_list = np.sort(np.concatenate((cp_list,[cp])))
+            
+    return cp_list
