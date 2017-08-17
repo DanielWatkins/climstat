@@ -46,6 +46,8 @@ def parse_IGRA_header(header_line):
     """Extract information from the header to individual data records in
     the IGRA2 data. Returns a dictionary with date, number of levels, lat,
     and lon."""
+    import numpy as np
+    import pandas as pd
     
     HEADREC       = header_line[0]
     ID            = header_line[1:12]
@@ -62,13 +64,18 @@ def parse_IGRA_header(header_line):
     
     date = pd.to_datetime('-'.join([YEAR,MONTH,DAY,HOUR]))
     
-    return {'date':date,'numlev':int(NUMLEV),'lat':int(LAT),'lon':ind(LON)}
+    return {'date':date,'numlev':int(NUMLEV),'lat':int(LAT),'lon':int(LON)}
 
 def parse_IGRA_body(begin_idx,lines):
     """Extracts data from single radiosonde launch. Begin_idx is the index of
     the data header supplied by getIDLines(). Returns a dataframe with columns
-    'date','p','gph','t','rh'.""" 
-    header = parse_IGRA_eader(lines[begin_idx])
+    'date','p','gph','t','rh'.
+    Units: p in hPa, gph in m, t in K, rh in %""" 
+    
+    import pandas as pd
+    import numpy as np
+    
+    header = parse_IGRA_header(lines[begin_idx])
     date = header['date']
     n = header['numlev']
     PRESS = np.zeros(n)
@@ -80,13 +87,13 @@ def parse_IGRA_body(begin_idx,lines):
         i = begin_idx + 1 + j
         PRESS[j] = np.float(lines[i][9:15])/100
         GPH[j] = np.int(lines[i][16:21])
-        TEMP[j] = np.float(lines[i][22:27])
-        RH[j] = np.float(lines[i][28:33])
+        TEMP[j] = np.float(lines[i][22:27])/10+273.15
+        RH[j] = np.float(lines[i][28:33])/10
         
     PRESS[PRESS < 0] = np.nan
     GPH[GPH < 0] = np.nan
-    TEMP[TEMP < -9000] = np.nan
-    RH[RH < -9000] = np.nan
+    TEMP[TEMP < 0] = np.nan
+    RH[RH < 0] = np.nan
         
     return pd.DataFrame({'date':np.repeat(date,n),'p':PRESS,'gph':GPH,'t':TEMP,'rh':RH}) 
     
