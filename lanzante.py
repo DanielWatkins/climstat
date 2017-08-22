@@ -1,5 +1,5 @@
 def robust_rank_order_test(x,y):
-    """From Lazante 1996: The robust rank-order test is similar in nature 
+    """From Lanzante 1996: The robust rank-order test is similar in nature 
     to the WIlcoxon-Mann-Whitney test in that it is also a test for 
     equality of medians based on two samples; by contrast the rank-order 
     test does not assume that the parent populations have equal variance. 
@@ -58,7 +58,7 @@ def robust_rank_order_test(x,y):
 
 def single_change_point_test(x, secondary=False):
     """
-    From Lazante 1996: The change-point test presented here is used to determine if, and 
+    From Lanzante 1996: The change-point test presented here is used to determine if, and 
     locate a point in the time series at which, the median changes. The 
     test is based on summing the ranks of the data from the beginning to 
     each point in the series; each raw sum is adjusted by the amount 
